@@ -1,29 +1,16 @@
-# use debian as the base image
-FROM debian:buster
+FROM	debian:bullseye
 
-# install MariaDB and other dependencies
-RUN apt-get update -y
-RUN apt-get upgrade -y
-RUN apt-get install -y mariadb-server
-RUN apt-get install -y mariadb-client
-RUN apt-get install -y procps
+EXPOSE	3306
 
+RUN		apt update && \
+		apt install -y --no-install-recommends --no-install-suggests \
+		mariadb-server && \
+		rm -rf /var/lib/apt/lists/*
 
-# copy the provided config file to the container
-COPY ./conf/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.cnf
+COPY	conf/50-server.cnf /etc/mysql/mariadb.conf.d/
 
-RUN mkdir -p /var/run/mysqld
-RUN mkdir -p /var/lib/mysql
-RUN chown mysql:mysql /var/run/mysqld/
-RUN chmod -R 755 /var/run/mysqld/
-RUN chown mysql:mysql /var/lib/mysql/
-RUN chmod -R 755 /var/lib/mysql/
+COPY	tools/setup.sh /bin/
 
-EXPOSE 3306
+RUN		chmod +x /bin/setup.sh
 
-COPY ./tools/dbscript.sh ./
-RUN chmod +x ./dbscript.sh
-
-COPY conf/50-server.cnf	/etc/mysql/mariadb.conf.d/50-server.cnf
-
-ENTRYPOINT ["bash", "./dbscript.sh"]
+CMD		["setup.sh", "mysqld_safe"]

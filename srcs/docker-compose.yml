@@ -1,82 +1,67 @@
-version: '3'
-
 services:
+
+  # ne depend pas des autres
   mariadb:
-    image: mariadb
     container_name: mariadb
-    build:
-      context: ./requirements/mariadb
-      dockerfile: Dockerfile
+    build: ./requirements/mariadb/
     volumes:
-      - mariadb:/var/lib/mysql
-    expose:
-      - "3306"
+      - database:/var/lib/mysql/
     networks:
-      - inception
-    restart: unless-stopped
-    env_file: .env
-    healthcheck:
-      test: mysqladmin ping --host=localhost -p${SQL_ROOT_PASSWORD}
-      interval: 5s
-      timeout: 1s
-      retries: 20
-      start_period: 5s
+      - all
+    init: true
+    restart: on-failure
+    env_file:
+      - .env
 
+  # depend de mariadb
   wordpress:
-    image: wordpress
     container_name: wordpress
-    build:
-      context: ./requirements/wordpress
-      dockerfile: Dockerfile
+    build: ./requirements/wordpress/
     volumes:
-      - wordpress:/var/www/html/wordpress
-    expose:
-      - "9000"
+      - wordpress_files:/var/www/inception/
     networks:
-      - inception
-    restart: unless-stopped
-    env_file: .env
+      - all
+    init: true
+    restart: on-failure
+    env_file:
+      - .env
     depends_on:
-      mariadb:
-        condition: service_healthy    
+      - mariadb
 
+  # depend de wordpress
   nginx:
-    image: nginx
     container_name: nginx
-    build:
-      context: ./requirements/nginx
-      dockerfile: Dockerfile	
+    build: ./requirements/nginx/
+    ports: # Redirige le port 443 de l'host vers le port 443 du conteneur
+      - '443:443'
     volumes:
-      - wordpress:/var/www/html/wordpress
+      - wordpress_files:/var/www/inception/
+    networks: 
+      - all
+    init: true
+    restart: on-failure
+    env_file:
+      - .env
     depends_on:
       - wordpress
-    ports:
-      - "443:443"
-    networks:
-      - inception
-    restart: unless-stopped
-    env_file: .env
-    healthcheck:
-      test: 'curl -kfsSL https://localhost:443/status'
-      interval: 5s
-      timeout: 1s
-      retries: 10
-      start_period: 5s
 
 volumes:
-  mariadb:
+
+  database:
     driver: local
     driver_opts:
-      type: 'none'
-      o: 'bind'
-      device: '/home/vtestut/data/mariadb'
-  wordpress:
+      type: none
+      o: bind
+      device: /home/vtestut/data/database
+
+
+  wordpress_files:
     driver: local
     driver_opts:
-      type: 'none'
-      o: 'bind'
-      device: '/home/vtestut/data/wordpress'
+      type: none
+      o: bind
+      device: /home/vtestut/data/wordpress_files
 
 networks:
-  inception:
-    name: inception
+  all:
+    driver: bridge # permet au conteneur communiquer entre eux via des adresses IP privées tout en étant isolés du reste du réseau.
